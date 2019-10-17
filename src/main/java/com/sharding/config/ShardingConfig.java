@@ -1,6 +1,7 @@
 package com.sharding.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.shardingsphere.api.config.masterslave.MasterSlaveRuleConfiguration;
 import org.apache.shardingsphere.shardingjdbc.api.MasterSlaveDataSourceFactory;
@@ -31,12 +32,16 @@ public class ShardingConfig {
 
     @Bean
     DataSource getMasterSlaveDataSource() throws SQLException {
+        log.info("datasource执行+++");
+        Properties properties = new Properties();
+        properties.setProperty("sql.show", String.valueOf(true));
         MasterSlaveRuleConfiguration masterSlaveRuleConfig = new MasterSlaveRuleConfiguration("ds_master_slave", "ds_master", Arrays.asList("ds_slave"));
-        return MasterSlaveDataSourceFactory.createDataSource(createDataSourceMap(), masterSlaveRuleConfig, new Properties());
+        return MasterSlaveDataSourceFactory.createDataSource(createDataSourceMap(), masterSlaveRuleConfig, properties);
     }
 
     Map<String, DataSource> createDataSourceMap() {
-        Map<String, DataSource> result = new HashMap<>();
+        log.info("创建数据源+++");
+        Map<String, DataSource> result = new HashMap<>(10);
         result.put("ds_master", DataSourceUtil.createDataSource("sharding_w"));
         result.put("ds_slave", DataSourceUtil.createDataSource("sharding_r"));
         return result;
@@ -44,18 +49,24 @@ public class ShardingConfig {
 
     @Bean
     public SqlSessionFactory sqlSessionFactory() throws Exception {
+        log.info("sqlFactory执行+++");
         SqlSessionFactoryBean factoryBean = new SqlSessionFactoryBean();
         factoryBean.setDataSource(getMasterSlaveDataSource());
         //添加xml
         ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         factoryBean.setMapperLocations(resolver.getResources("classpath*:mapper/*.xml"));
         log.info("加载xml");
+        Interceptor[] interceptors = new Interceptor[1];
+        interceptors[0] = new TestInterceptor();
+        factoryBean.setPlugins(interceptors);
         return factoryBean.getObject();
     }
 
     @Bean
     public SqlSessionTemplate sqlSessionTemplate() throws Exception {
-        SqlSessionTemplate template = new SqlSessionTemplate(sqlSessionFactory()); // 使用上面配置的Factory
+        log.info("sqlTemplate执行+++");
+        // 使用上面配置的Factory
+        SqlSessionTemplate template = new SqlSessionTemplate(sqlSessionFactory());
         return template;
     }
 }
